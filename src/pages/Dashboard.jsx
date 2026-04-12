@@ -46,7 +46,7 @@ export default function Dashboard() {
       <motion.div variants={item} className="dashboard-hero">
         <div className="hero-content">
           <h1 className="hero-title">
-            Welcome back, <span className="gradient-text">{state.user.name}</span> 👋
+            Welcome back, <span className="gradient-text">{state.user.name}</span>
           </h1>
           <p className="hero-quote">"{quote}"</p>
           <div className="hero-actions">
@@ -79,7 +79,7 @@ export default function Dashboard() {
           value={totalTasks}
           label="Study Tasks"
           color="var(--accent-secondary)"
-          gradient="var(--gradient-cool)"
+          gradient="var(--gradient-primary)"
         />
         <StatCard
           icon={<HiOutlineCheckCircle />}
@@ -145,12 +145,12 @@ export default function Dashboard() {
 
       {/* Quick Access Agent Cards */}
       <motion.div variants={item} className="section" style={{ marginTop: '28px' }}>
-        <div className="section-title">🤖 AI Agents</div>
+        <div className="section-title"><HiOutlineLightningBolt className="icon" /> AI Agents</div>
         <div className="grid-3">
           <AgentCard
             title="Planner Agent"
             description="Create study schedules, manage subjects, and track your progress toward deadlines."
-            icon="📋"
+            Icon={HiOutlineCalendar}
             color="var(--accent-primary)"
             link="/planner"
             features={['Study Schedule', 'Task Management', 'Deadline Tracking']}
@@ -158,7 +158,7 @@ export default function Dashboard() {
           <AgentCard
             title="Tutor Agent"
             description="Get interactive explanations, ask questions, and explore concepts across multiple subjects."
-            icon="🎓"
+            Icon={HiOutlineAcademicCap}
             color="var(--accent-secondary)"
             link="/tutor"
             features={['Concept Explanations', 'Q&A Chat', 'Topic Browser']}
@@ -166,7 +166,7 @@ export default function Dashboard() {
           <AgentCard
             title="Evaluator Agent"
             description="Take quizzes, get instant feedback, and track your performance over time."
-            icon="📊"
+            Icon={HiOutlineClipboardCheck}
             color="var(--accent-success)"
             link="/evaluator"
             features={['Quiz Generation', 'Auto-Grading', 'Performance Analytics']}
@@ -176,8 +176,9 @@ export default function Dashboard() {
 
       <style>{`
         .dashboard-hero {
-          background: var(--gradient-hero);
+          background: var(--bg-card);
           border: 1px solid var(--border-color);
+          border-left: 4px solid var(--accent-primary);
           border-radius: var(--radius-xl);
           padding: 40px 44px;
           margin-bottom: 28px;
@@ -187,46 +188,41 @@ export default function Dashboard() {
         .hero-content { position: relative; z-index: 2; }
         .hero-title {
           font-size: 2.2rem;
-          font-weight: 800;
+          font-weight: 400;
           margin-bottom: 12px;
           font-family: var(--font-heading);
+          color: var(--text-primary);
         }
-        .gradient-text {
-          background: var(--gradient-primary);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
+        .gradient-text { color: var(--accent-primary); }
         .hero-quote {
-          color: var(--text-secondary);
-          font-size: 1rem;
+          color: var(--text-muted);
+          font-size: 0.95rem;
           font-style: italic;
           margin-bottom: 24px;
           max-width: 600px;
+          border-left: 2px solid var(--cream-dark);
+          padding-left: 14px;
         }
         .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
-        .hero-decoration { position: absolute; top: 0; right: 0; bottom: 0; width: 50%; pointer-events: none; }
+        .hero-decoration { position: absolute; top: 0; right: 0; bottom: 0; width: 40%; pointer-events: none; }
         .hero-orb {
           position: absolute;
           border-radius: 50%;
-          animation: float 6s ease-in-out infinite;
         }
         .hero-orb-1 {
-          width: 200px; height: 200px;
-          background: radial-gradient(circle, rgba(108,99,255,0.12), transparent);
-          top: 10%; right: 10%;
+          width: 220px; height: 220px;
+          background: radial-gradient(circle, rgba(228,61,18,0.06), transparent);
+          top: -10%; right: 5%;
         }
         .hero-orb-2 {
-          width: 150px; height: 150px;
-          background: radial-gradient(circle, rgba(0,210,255,0.1), transparent);
-          bottom: 10%; right: 30%;
-          animation-delay: -2s;
+          width: 160px; height: 160px;
+          background: radial-gradient(circle, rgba(239,177,29,0.08), transparent);
+          bottom: -10%; right: 25%;
         }
         .hero-orb-3 {
-          width: 100px; height: 100px;
-          background: radial-gradient(circle, rgba(123,97,255,0.1), transparent);
-          top: 30%; right: 50%;
-          animation-delay: -4s;
+          width: 120px; height: 120px;
+          background: radial-gradient(circle, rgba(213,83,109,0.06), transparent);
+          top: 20%; right: 40%;
         }
 
         .task-list { display: flex; flex-direction: column; gap: 8px; }
@@ -236,14 +232,14 @@ export default function Dashboard() {
           align-items: center;
           gap: 12px;
           padding: 12px 16px;
-          background: var(--bg-glass);
-          border: 1px solid var(--border-light);
+          background: var(--bg-secondary);
+          border: 1px solid var(--border-color);
           border-radius: var(--radius-md);
           transition: all var(--transition-normal);
         }
         .task-item:hover {
           border-color: var(--border-accent);
-          background: var(--bg-glass-hover);
+          background: var(--bg-secondary);
         }
         .task-color {
           width: 4px; height: 36px;
@@ -280,7 +276,7 @@ export default function Dashboard() {
         .task-check.done {
           background: var(--accent-success);
           border-color: var(--accent-success);
-          color: #0a0a1a;
+          color: white;
         }
         .task-check:hover {
           border-color: var(--accent-success);
@@ -307,14 +303,17 @@ export default function Dashboard() {
           border-radius: var(--radius-lg) var(--radius-lg) 0 0;
         }
         .agent-card:hover {
-          transform: translateY(-4px);
+          transform: translateY(-3px);
           border-color: var(--border-accent);
-          box-shadow: var(--shadow-glow-accent);
+          box-shadow: var(--shadow-md);
         }
         .agent-card-icon {
-          font-size: 2.2rem;
+          width: 44px; height: 44px;
+          border-radius: var(--radius-md);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 1.3rem;
           margin-bottom: 16px;
-          animation: float 4s ease-in-out infinite;
+          color: white;
         }
         .agent-card h3 {
           font-size: 1.1rem;
@@ -338,10 +337,10 @@ export default function Dashboard() {
           padding: 4px 10px;
           border-radius: var(--radius-full);
           font-size: 0.7rem;
-          font-weight: 600;
-          background: var(--bg-glass);
-          border: 1px solid var(--border-light);
-          color: var(--text-secondary);
+          font-weight: 500;
+          background: var(--bg-secondary);
+          border: 1px solid var(--border-color);
+          color: var(--text-muted);
         }
         .agent-card-link {
           display: inline-flex;
@@ -406,11 +405,11 @@ function TaskItem({ task, showDate }) {
   );
 }
 
-function AgentCard({ title, description, icon, color, link, features }) {
+function AgentCard({ title, description, Icon, color, link, features }) {
   return (
     <div className="agent-card">
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: color }} />
-      <div className="agent-card-icon">{icon}</div>
+      <div className="agent-card-icon" style={{ background: color }}><Icon /></div>
       <h3>{title}</h3>
       <p>{description}</p>
       <div className="agent-features">

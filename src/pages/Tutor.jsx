@@ -130,7 +130,7 @@ export default function Tutor() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
       <div className="page-header">
-        <h1>🎓 Tutor Agent</h1>
+        <h1>Tutor Agent</h1>
         <p className="subtitle">Learn concepts interactively, ask questions, and explore topics</p>
       </div>
 
@@ -183,13 +183,13 @@ export default function Tutor() {
       {/* Tabs */}
       <div className="tabs">
         <button className={`tab ${activeTab === 'chat' ? 'active' : ''}`} onClick={() => setActiveTab('chat')}>
-          💬 Chat
+          Chat
         </button>
         <button className={`tab ${activeTab === 'browse' ? 'active' : ''}`} onClick={() => setActiveTab('browse')}>
-          📖 Browse Topics
+          Browse Topics
         </button>
         <button className={`tab ${activeTab === 'explore' ? 'active' : ''}`} onClick={() => setActiveTab('explore')}>
-          🔍 Explore
+          Explore
         </button>
       </div>
 
@@ -200,7 +200,7 @@ export default function Tutor() {
               <div className="chat-messages">
                 {state.chatHistory.length === 0 && (
                   <div className="chat-welcome">
-                    <div className="chat-welcome-icon">🎓</div>
+                    <div className="chat-welcome-icon"><HiOutlineAcademicCap /></div>
                     <h3>Welcome to the AI Tutor!</h3>
                     <p>
                       {aiMode && backendStatus?.docCount > 0
@@ -409,9 +409,12 @@ export default function Tutor() {
           padding: 40px 20px;
         }
         .chat-welcome-icon {
-          font-size: 3rem;
+          font-size: 2.5rem;
           margin-bottom: 12px;
-          animation: float 4s ease-in-out infinite;
+          color: var(--accent-primary);
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
         .chat-welcome h3 { font-size: 1.2rem; margin-bottom: 8px; }
         .chat-welcome p { color: var(--text-secondary); margin-bottom: 16px; font-size: 0.9rem; }
@@ -428,7 +431,7 @@ export default function Tutor() {
           font-family: var(--font-body);
         }
         .chat-suggestions .chip:hover {
-          background: var(--bg-glass-hover);
+          background: var(--bg-secondary);
           border-color: var(--accent-primary);
           color: var(--accent-primary);
         }
@@ -489,7 +492,7 @@ export default function Tutor() {
         }
         .source-chip {
           padding: 2px 8px; border-radius: 10;
-          background: rgba(108,99,255,0.12); border: 1px solid rgba(108,99,255,0.25);
+          background: rgba(228,61,18,0.1); border: 1px solid rgba(228,61,18,0.25);
           color: var(--accent-primary); border-radius: 20px;
           cursor: default; font-size: 0.72rem;
         }
@@ -521,7 +524,7 @@ export default function Tutor() {
           text-align: left; width: 100%;
         }
         .topic-button:hover {
-          background: var(--bg-glass-hover);
+          background: var(--bg-secondary);
           border-color: var(--accent-primary);
           color: var(--text-primary);
         }

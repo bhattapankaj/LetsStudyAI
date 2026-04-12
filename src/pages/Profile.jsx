@@ -32,7 +32,7 @@ export default function Profile() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
       <div className="page-header">
-        <h1>👤 Profile</h1>
+        <h1>Profile</h1>
         <p className="subtitle">Manage your settings and view your overall progress</p>
       </div>
 
@@ -41,13 +41,13 @@ export default function Profile() {
         <div className="card">
           <div style={{ textAlign: 'center', marginBottom: '24px' }}>
             <div style={{
-              width: 80, height: 80, borderRadius: '50%',
-              background: 'var(--gradient-secondary)',
+              width: 72, height: 72, borderRadius: '50%',
+              background: 'var(--accent-primary)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '2.5rem', margin: '0 auto 16px',
-              boxShadow: 'var(--shadow-glow-accent)',
+              fontSize: '1.6rem', margin: '0 auto 16px',
+              color: 'white', fontWeight: 700, fontFamily: 'var(--font-body)',
             }}>
-              {state.user.avatar}
+              {(state.user.name || 'S').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
             </div>
             <h2 style={{ fontSize: '1.3rem', marginBottom: '4px' }}>{state.user.name}</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{state.user.grade}</p>
@@ -155,7 +155,7 @@ export default function Profile() {
               <div className="progress-bar" style={{ marginTop: '12px' }}>
                 <div className="progress-fill" style={{
                   width: `${report.averageScore}%`,
-                  background: report.averageScore >= 80 ? 'var(--gradient-success)' : report.averageScore >= 60 ? 'var(--gradient-warm)' : 'var(--gradient-danger)',
+                  background: report.averageScore >= 80 ? 'var(--accent-success)' : report.averageScore >= 60 ? 'var(--accent-tertiary)' : 'var(--accent-primary)',
                 }} />
               </div>
             </div>

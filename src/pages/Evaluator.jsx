@@ -76,16 +76,16 @@ export default function Evaluator() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
       <div className="page-header">
-        <h1>📊 Evaluator Agent</h1>
+        <h1>Evaluator Agent</h1>
         <p className="subtitle">Take quizzes, track your performance, and identify areas to improve</p>
       </div>
 
       <div className="tabs">
         <button className={`tab ${activeTab === 'quiz' ? 'active' : ''}`} onClick={() => setActiveTab('quiz')}>
-          📝 Take Quiz
+          Take Quiz
         </button>
         <button className={`tab ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
-          📈 Performance
+          Performance
         </button>
       </div>
 
@@ -156,7 +156,7 @@ export default function Evaluator() {
           flex: 1;
           height: 4px;
           border-radius: var(--radius-full);
-          background: var(--bg-tertiary);
+          background: var(--bg-secondary);
           transition: background 0.3s ease;
         }
         .quiz-progress-dot.answered { background: var(--accent-primary); }
@@ -221,12 +221,12 @@ export default function Evaluator() {
         }
         .option:hover {
           border-color: var(--accent-primary);
-          background: rgba(108,99,255,0.06);
+          background: rgba(228,61,18,0.05);
           color: var(--text-primary);
         }
         .option.selected {
           border-color: var(--accent-primary);
-          background: rgba(108,99,255,0.12);
+          background: rgba(228,61,18,0.1);
           color: var(--text-primary);
         }
         .option-letter {
@@ -238,7 +238,7 @@ export default function Evaluator() {
           justify-content: center;
           font-weight: 700;
           font-size: 0.8rem;
-          background: var(--bg-tertiary);
+          background: var(--bg-secondary);
           flex-shrink: 0;
           transition: all var(--transition-normal);
         }
@@ -363,7 +363,7 @@ export default function Evaluator() {
         .score-bar-track {
           flex: 1;
           height: 8px;
-          background: var(--bg-tertiary);
+          background: var(--bg-secondary);
           border-radius: var(--radius-full);
           overflow: hidden;
         }
@@ -466,7 +466,7 @@ function QuizInterface({ quiz, currentQuestion, setCurrentQuestion, answers, onA
           <div
             className="question-timer"
             style={{
-              background: timerDanger ? 'rgba(255,82,82,0.15)' : 'rgba(108,99,255,0.15)',
+              background: timerDanger ? 'rgba(228,61,18,0.12)' : 'rgba(228,61,18,0.1)',
               color: timerDanger ? 'var(--accent-danger)' : 'var(--accent-primary)',
             }}
           >
@@ -507,7 +507,7 @@ function QuizInterface({ quiz, currentQuestion, setCurrentQuestion, answers, onA
                 onClick={() => setCurrentQuestion(i)}
                 style={{
                   width: 32, height: 32, borderRadius: '50%', border: 'none',
-                  background: i === currentQuestion ? 'var(--accent-primary)' : answers[i] !== undefined ? 'rgba(108,99,255,0.2)' : 'var(--bg-tertiary)',
+                  background: i === currentQuestion ? 'var(--accent-primary)' : answers[i] !== undefined ? 'rgba(228,61,18,0.12)' : 'var(--bg-secondary)',
                   color: i === currentQuestion ? 'white' : 'var(--text-secondary)',
                   cursor: 'pointer', fontWeight: 600, fontSize: '0.75rem',
                   fontFamily: 'var(--font-body)', transition: 'all 0.2s ease',
@@ -544,13 +544,13 @@ function QuizResults({ result, onRetry }) {
   return (
     <div style={{ maxWidth: '720px', margin: '0 auto' }}>
       <div className="result-card">
-        <div style={{ fontSize: '3rem' }}>{result.grade.emoji}</div>
+        <div style={{ fontSize: '2.5rem', fontWeight: 700, color: scoreColor, fontFamily: 'var(--font-body)' }}>{result.grade.letter}</div>
         <div className="result-score" style={{ color: scoreColor }}>
           {result.percentage}%
         </div>
         <div className="result-grade">
           <span className="badge" style={{ background: `${scoreColor}20`, color: scoreColor, fontSize: '0.9rem', padding: '6px 16px' }}>
-            Grade: {result.grade.letter} — {result.grade.label}
+            {result.grade.label}
           </span>
         </div>
         <p className="result-feedback">{result.feedback}</p>
@@ -562,7 +562,7 @@ function QuizResults({ result, onRetry }) {
       </div>
 
       <div className="card">
-        <div className="section-title">📋 Detailed Results</div>
+        <div className="section-title">Detailed Results</div>
         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
           {result.subject} → {result.topic} • {result.score}/{result.totalQuestions} correct
         </div>
@@ -570,7 +570,7 @@ function QuizResults({ result, onRetry }) {
           {result.results.map((r, i) => (
             <div key={i} className="result-item">
               <div className="result-icon" style={{
-                background: r.isCorrect ? 'rgba(0,230,118,0.15)' : 'rgba(255,82,82,0.15)',
+                background: r.isCorrect ? 'rgba(42,122,75,0.12)' : 'rgba(228,61,18,0.12)',
                 color: r.isCorrect ? 'var(--accent-success)' : 'var(--accent-danger)',
               }}>
                 {r.isCorrect ? <HiOutlineCheck /> : <HiOutlineX />}
@@ -581,7 +581,7 @@ function QuizResults({ result, onRetry }) {
                   <span>Your answer: <strong style={{ color: r.isCorrect ? 'var(--accent-success)' : 'var(--accent-danger)' }}>{r.userAnswer}</strong></span>
                   {!r.isCorrect && <span>Correct answer: <strong style={{ color: 'var(--accent-success)' }}>{r.correctAnswer}</strong></span>}
                 </div>
-                <div className="explanation">💡 {r.explanation}</div>
+                <div className="explanation">{r.explanation}</div>
               </div>
             </div>
           ))}
@@ -621,7 +621,7 @@ function PerformanceDashboard({ report, quizHistory }) {
           <p>Average Score</p>
         </div>
         <div className="perf-card">
-          <span style={{ fontSize: '1.5rem' }}>{report.grade.emoji}</span>
+          <HiOutlineAcademicCap style={{ fontSize: '1.5rem', color: avgColor }} />
           <h3 style={{ color: avgColor }}>{report.grade.letter}</h3>
           <p>Overall Grade</p>
         </div>
@@ -650,12 +650,12 @@ function PerformanceDashboard({ report, quizHistory }) {
         </div>
 
         <div className="card">
-          <div className="section-title">💪 Strengths & Weaknesses</div>
+          <div className="section-title">Strengths & Weaknesses</div>
           {report.strengths.length > 0 && (
             <div style={{ marginBottom: '16px' }}>
-              <h4 style={{ fontSize: '0.85rem', color: 'var(--accent-success)', marginBottom: '8px' }}>✅ Strengths</h4>
+              <h4 style={{ fontSize: '0.85rem', color: 'var(--accent-success)', marginBottom: '8px' }}>Strengths</h4>
               {report.strengths.map(s => (
-                <div key={s} style={{ padding: '8px 12px', background: 'rgba(0,230,118,0.06)', borderRadius: 'var(--radius-sm)', marginBottom: '4px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                <div key={s} style={{ padding: '8px 12px', background: 'rgba(42,122,75,0.06)', borderRadius: 'var(--radius-sm)', marginBottom: '4px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                   {s}
                 </div>
               ))}
@@ -665,7 +665,7 @@ function PerformanceDashboard({ report, quizHistory }) {
             <div>
               <h4 style={{ fontSize: '0.85rem', color: 'var(--accent-danger)', marginBottom: '8px' }}>⚠️ Needs Work</h4>
               {report.weaknesses.map(w => (
-                <div key={w} style={{ padding: '8px 12px', background: 'rgba(255,82,82,0.06)', borderRadius: 'var(--radius-sm)', marginBottom: '4px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                <div key={w} style={{ padding: '8px 12px', background: 'rgba(228,61,18,0.06)', borderRadius: 'var(--radius-sm)', marginBottom: '4px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                   {w}
                 </div>
               ))}

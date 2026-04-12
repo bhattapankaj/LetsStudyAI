@@ -4,6 +4,7 @@ import {
   HiOutlineUpload, HiOutlineDocument, HiOutlineTrash,
   HiOutlineCheckCircle, HiOutlineExclamationCircle,
   HiOutlineDocumentText, HiOutlineInformationCircle,
+  HiOutlineCloudUpload, HiOutlineFolder, HiOutlineDocumentDuplicate,
 } from 'react-icons/hi';
 
 const API_BASE = 'http://localhost:3001/api';
@@ -129,17 +130,13 @@ export default function Documents() {
   }
 
   function getFileIcon(name) {
-    const ext = name.split('.').pop().toLowerCase();
-    if (ext === 'pdf') return '📄';
-    if (ext === 'docx' || ext === 'doc') return '📝';
-    if (ext === 'txt' || ext === 'md') return '📃';
-    return '📄';
+    return <HiOutlineDocumentText style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }} />;
   }
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
       <div className="page-header">
-        <h1>📚 My Study Notes</h1>
+        <h1>My Study Notes</h1>
         <p className="subtitle">Upload your notes and documents — the AI Tutor will answer questions using them</p>
       </div>
 
@@ -225,7 +222,7 @@ export default function Documents() {
           </div>
         ) : (
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '3rem', marginBottom: 12 }}>{dragActive ? '📥' : '📤'}</div>
+            <div style={{ fontSize: '2.5rem', marginBottom: 12, color: dragActive ? 'var(--accent-primary)' : 'var(--text-muted)' }}><HiOutlineCloudUpload /></div>
             <div style={{ fontWeight: 600, fontSize: '1rem', marginBottom: 6 }}>
               {dragActive ? 'Drop to upload' : 'Upload your study notes'}
             </div>
@@ -252,18 +249,18 @@ export default function Documents() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
           {[
-            { step: '1', icon: '📤', label: 'Upload your notes', desc: 'PDF, Word, or text files' },
-            { step: '2', icon: '🔍', label: 'AI indexes content', desc: 'Text is split into searchable chunks' },
-            { step: '3', icon: '💬', label: 'Ask the Tutor', desc: 'Answers come from YOUR notes' },
+            { step: '1', Icon: HiOutlineCloudUpload, label: 'Upload your notes', desc: 'PDF, Word, or text files' },
+            { step: '2', Icon: HiOutlineInformationCircle, label: 'AI indexes content', desc: 'Text is split into searchable chunks' },
+            { step: '3', Icon: HiOutlineDocumentDuplicate, label: 'Ask the Tutor', desc: 'Answers come from YOUR notes' },
           ].map(s => (
             <div key={s.step} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
               <span style={{
-                width: 24, height: 24, borderRadius: '50%', background: 'var(--gradient-primary)',
+                width: 22, height: 22, borderRadius: '50%', background: 'var(--accent-primary)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '0.72rem', fontWeight: 700, color: 'white', flexShrink: 0,
+                fontSize: '0.68rem', fontWeight: 700, color: 'white', flexShrink: 0,
               }}>{s.step}</span>
               <div>
-                <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>{s.icon} {s.label}</div>
+                <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>{s.label}</div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{s.desc}</div>
               </div>
             </div>
@@ -297,7 +294,7 @@ export default function Documents() {
               className="empty-state"
               style={{ padding: '40px 20px' }}
             >
-              <div className="emoji">📂</div>
+              <HiOutlineFolder style={{ fontSize: '2.5rem', color: 'var(--text-muted)', opacity: 0.4, marginBottom: 12 }} />
               <h3>No documents yet</h3>
               <p>Upload your lecture notes, textbook chapters, or any study material above.<br />The AI Tutor will answer questions directly from your content.</p>
             </motion.div>

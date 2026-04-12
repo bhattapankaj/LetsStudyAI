@@ -5,9 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { HiOutlinePlus, HiOutlineTrash, HiOutlineCalendar, HiOutlineLightningBolt, HiOutlineCheckCircle, HiOutlineClock, HiOutlineX, HiOutlineSparkles } from 'react-icons/hi';
 
 const SUBJECT_COLORS = [
-  '#6C63FF', '#00D2FF', '#FF6B9D', '#00E676',
-  '#FFB300', '#FF8A50', '#7B61FF', '#1DE9B6',
-  '#448AFF', '#FF5252',
+  '#E43D12', '#D6536D', '#EFB11D', '#2A7A4B',
+  '#3B6FD4', '#C2410C', '#7C3AED', '#1D7A6E',
+  '#B45309', '#9D1E73',
 ];
 
 const SAMPLE_SUBJECTS = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'Computer Science', 'English', 'History', 'Science'];
@@ -54,7 +54,7 @@ export default function Planner() {
     dispatch({ type: 'SET_STUDY_PLAN', payload: plan });
     dispatch({
       type: 'ADD_NOTIFICATION',
-      payload: { id: Date.now(), text: '📋 Study plan generated successfully!', time: new Date().toISOString() }
+      payload: { id: Date.now(), text: 'Study plan generated successfully!', time: new Date().toISOString() }
     });
   };
 
@@ -70,14 +70,14 @@ export default function Planner() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
       <div className="page-header">
-        <h1>📋 Planner Agent</h1>
+        <h1>Planner Agent</h1>
         <p className="subtitle">Create study schedules, manage subjects, and track your progress</p>
       </div>
 
       {/* Stats Row */}
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'rgba(108,99,255,0.15)', color: 'var(--accent-primary)' }}>
+          <div className="stat-icon" style={{ background: 'rgba(228,61,18,0.1)', color: 'var(--accent-primary)' }}>
             <HiOutlineCalendar />
           </div>
           <div className="stat-info">
@@ -86,16 +86,16 @@ export default function Planner() {
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'rgba(0,210,255,0.15)', color: 'var(--accent-secondary)' }}>
+          <div className="stat-icon" style={{ background: 'rgba(213,83,109,0.1)', color: 'var(--accent-secondary)' }}>
             <HiOutlineClock />
           </div>
           <div className="stat-info">
-            <h3 style={{ color: 'var(--accent-secondary)' }}>{state.studyPlan.length}</h3>
+            <h3>{state.studyPlan.length}</h3>
             <p>Tasks</p>
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'rgba(0,230,118,0.15)', color: 'var(--accent-success)' }}>
+          <div className="stat-icon" style={{ background: 'rgba(42,122,75,0.1)', color: 'var(--accent-success)' }}>
             <HiOutlineCheckCircle />
           </div>
           <div className="stat-info">
@@ -104,11 +104,11 @@ export default function Planner() {
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'rgba(255,179,0,0.15)', color: 'var(--accent-warning)' }}>
+          <div className="stat-icon" style={{ background: 'rgba(239,177,29,0.12)', color: 'var(--accent-tertiary)' }}>
             <HiOutlineLightningBolt />
           </div>
           <div className="stat-info">
-            <h3 style={{ color: 'var(--accent-warning)' }}>{progress.completed}</h3>
+            <h3>{progress.completed}</h3>
             <p>Done</p>
           </div>
         </div>
@@ -215,7 +215,7 @@ export default function Planner() {
                     padding: '14px 16px', background: 'var(--bg-glass)',
                     border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)',
                   }}>
-                    <span style={{ fontSize: '1.2rem' }}>💡</span>
+                    <span style={{ color: 'var(--accent-tertiary)', flexShrink: 0 }}><HiOutlineLightningBolt /></span>
                     <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{tip}</span>
                   </div>
                 ))}
@@ -237,7 +237,7 @@ export default function Planner() {
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
             >
               <div className="modal-header">
-                <h2>📚 Add Subject</h2>
+                <h2>Add Subject</h2>
                 <button className="btn btn-icon btn-secondary" onClick={() => setShowAddForm(false)}>
                   <HiOutlineX />
                 </button>
@@ -349,7 +349,7 @@ export default function Planner() {
           transition: background var(--transition-fast);
         }
         .schedule-task:hover {
-          background: var(--bg-glass-hover);
+          background: var(--bg-secondary);
         }
         .schedule-task .task-color {
           width: 4px;
@@ -379,7 +379,7 @@ export default function Planner() {
         .subject-card:hover {
           transform: translateY(-2px);
           border-color: var(--border-accent);
-          box-shadow: var(--shadow-glow);
+          box-shadow: var(--shadow-md);
         }
         .subject-card-header {
           display: flex;
@@ -437,7 +437,7 @@ function SubjectCard({ subject, dispatch }) {
         ))}
       </div>
       <div className="meta">
-        <span>📅 {new Date(subject.deadline + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+        <span>{new Date(subject.deadline + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
         <span className={`badge badge-${subject.priority === 'high' ? 'danger' : subject.priority === 'medium' ? 'warning' : 'info'}`}>
           {subject.priority}
         </span>
@@ -454,7 +454,7 @@ function DayGroup({ date, tasks, dispatch }) {
   const today = new Date().toISOString().split('T')[0];
   const isToday = date === today;
   const dayLabel = isToday
-    ? '📌 Today'
+    ? 'Today'
     : dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 
   const completed = tasks.filter(t => t.completed).length;
@@ -475,7 +475,7 @@ function DayGroup({ date, tasks, dispatch }) {
               </div>
               <div className="subject-name">
                 {task.subjectName} • {task.duration}h
-                {task.type === 'revision' && ' • 📝 Revision'}
+                {task.type === 'revision' && ' • Revision'}
               </div>
             </div>
             <span className={`badge badge-${task.priority === 'high' ? 'danger' : task.priority === 'medium' ? 'warning' : 'info'}`}>
@@ -489,7 +489,7 @@ function DayGroup({ date, tasks, dispatch }) {
                 border: `2px solid ${task.completed ? 'var(--accent-success)' : 'var(--border-color)'}`,
                 background: task.completed ? 'var(--accent-success)' : 'transparent',
                 cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: task.completed ? '#0a0a1a' : 'transparent', fontSize: '12px',
+                color: task.completed ? 'white' : 'transparent', fontSize: '12px',
                 transition: 'all 0.2s ease',
               }}
             >
