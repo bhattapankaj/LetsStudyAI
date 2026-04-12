@@ -2,12 +2,30 @@ import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { evaluatorAgent } from '../agents/evaluatorAgent';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HiOutlineLightningBolt, HiOutlineCheck, HiOutlineX, HiOutlineChevronRight, HiOutlineTrendingUp, HiOutlineAcademicCap, HiOutlineClock } from 'react-icons/hi';
+import {
+  HiOutlineLightningBolt, HiOutlineCheck, HiOutlineX, HiOutlineTrendingUp,
+  HiOutlineAcademicCap, HiOutlineClock, HiOutlineDocumentText, HiOutlineRefresh,
+} from 'react-icons/hi';
+
+const BACKEND = 'http://localhost:3001';
 
 export default function Evaluator() {
   const { state, dispatch } = useApp();
   const [activeTab, setActiveTab] = useState('quiz');
+
+  // Local topic-based quiz state
   const [quizConfig, setQuizConfig] = useState({ subject: '', topic: '', numQuestions: 5 });
+
+  // Document-based quiz state
+  const [quizSource, setQuizSource] = useState('topic'); // 'topic' | 'document'
+  const [documents, setDocuments] = useState([]);
+  const [selectedDoc, setSelectedDoc] = useState('');
+  const [focusTopic, setFocusTopic] = useState('');
+  const [numDocQuestions, setNumDocQuestions] = useState(5);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [genError, setGenError] = useState('');
+
+  // Active quiz / results state
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState({});
   const [quizResult, setQuizResult] = useState(null);
@@ -18,37 +36,79 @@ export default function Evaluator() {
   const topics = quizConfig.subject ? evaluatorAgent.getTopics(quizConfig.subject) : [];
   const report = evaluatorAgent.getPerformanceReport(state.quizHistory);
 
+  // Fetch uploaded documents for the doc-based quiz picker
+  useEffect(() => {
+    fetch(`${BACKEND}/api/documents`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.documents) setDocuments(data.documents); })
+      .catch(() => {});
+  }, []);
+
   // Timer
   useEffect(() => {
     if (!timerActive || timeLeft <= 0) return;
     const interval = setInterval(() => {
       setTimeLeft(prev => {
-        if (prev <= 1) {
-          setTimerActive(false);
-          handleSubmitQuiz();
-          return 0;
-        }
+        if (prev <= 1) { setTimerActive(false); handleSubmitQuiz(); return 0; }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(interval);
   }, [timerActive, timeLeft]);
 
-  const startQuiz = () => {
+  // Start quiz from built-in topic bank
+  const startTopicQuiz = () => {
     if (!quizConfig.subject || !quizConfig.topic) return;
     const quiz = evaluatorAgent.generateQuiz(quizConfig.subject, quizConfig.topic, quizConfig.numQuestions);
     if (quiz.error) return;
     dispatch({ type: 'SET_CURRENT_QUIZ', payload: quiz });
-    setCurrentQuestion(0);
-    setAnswers({});
-    setQuizResult(null);
-    setTimeLeft(quiz.totalQuestions * 30); // 30 sec per question
+    setCurrentQuestion(0); setAnswers({}); setQuizResult(null);
+    setTimeLeft(quiz.totalQuestions * 30);
     setTimerActive(true);
   };
 
-  const handleAnswer = (questionIdx, answerIdx) => {
-    setAnswers(prev => ({ ...prev, [questionIdx]: answerIdx }));
+  // Start quiz from uploaded document via AI
+  const startDocumentQuiz = async () => {
+    if (!selectedDoc) return;
+    setIsGenerating(true);
+    setGenError('');
+    try {
+      const res = await fetch(`${BACKEND}/api/chat/generate-quiz`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentId: selectedDoc,
+          focusTopic: focusTopic.trim() || undefined,
+          numQuestions: numDocQuestions,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate quiz');
+      if (!data.questions?.length) throw new Error('No questions returned');
+
+      const quiz = {
+        id: `doc-${Date.now()}`,
+        subject: data.subject || 'Document Quiz',
+        topic: data.topic || focusTopic || documents.find(d => d.id === selectedDoc)?.name || 'Document',
+        sourceDoc: data.sourceDoc,
+        questions: data.questions,
+        totalQuestions: data.questions.length,
+        generatedAt: new Date().toISOString(),
+        fromDocument: true,
+      };
+      dispatch({ type: 'SET_CURRENT_QUIZ', payload: quiz });
+      setCurrentQuestion(0); setAnswers({}); setQuizResult(null);
+      setTimeLeft(quiz.totalQuestions * 40);
+      setTimerActive(true);
+    } catch (err) {
+      setGenError(err.message || 'Something went wrong. Is the backend running?');
+    } finally {
+      setIsGenerating(false);
+    }
   };
+
+  const handleAnswer = (questionIdx, answerIdx) =>
+    setAnswers(prev => ({ ...prev, [questionIdx]: answerIdx }));
 
   const handleSubmitQuiz = useCallback(() => {
     if (!state.currentQuiz) return;
@@ -60,11 +120,8 @@ export default function Evaluator() {
 
   const resetQuiz = () => {
     dispatch({ type: 'SET_CURRENT_QUIZ', payload: null });
-    setCurrentQuestion(0);
-    setAnswers({});
-    setQuizResult(null);
-    setTimeLeft(0);
-    setTimerActive(false);
+    setCurrentQuestion(0); setAnswers({}); setQuizResult(null);
+    setTimeLeft(0); setTimerActive(false); setGenError('');
   };
 
   const formatTime = (seconds) => {
@@ -94,11 +151,23 @@ export default function Evaluator() {
           <motion.div key="quiz" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
             {!state.currentQuiz && !quizResult ? (
               <QuizSetup
+                quizSource={quizSource}
+                setQuizSource={setQuizSource}
                 config={quizConfig}
                 setConfig={setQuizConfig}
                 subjects={subjects}
                 topics={topics}
-                onStart={startQuiz}
+                onStartTopic={startTopicQuiz}
+                documents={documents}
+                selectedDoc={selectedDoc}
+                setSelectedDoc={setSelectedDoc}
+                focusTopic={focusTopic}
+                setFocusTopic={setFocusTopic}
+                numDocQuestions={numDocQuestions}
+                setNumDocQuestions={setNumDocQuestions}
+                onStartDoc={startDocumentQuiz}
+                isGenerating={isGenerating}
+                genError={genError}
               />
             ) : quizResult ? (
               <QuizResults result={quizResult} onRetry={resetQuiz} />
@@ -383,61 +452,226 @@ export default function Evaluator() {
   );
 }
 
-function QuizSetup({ config, setConfig, subjects, topics, onStart }) {
+function QuizSetup({
+  quizSource, setQuizSource,
+  config, setConfig, subjects, topics, onStartTopic,
+  documents, selectedDoc, setSelectedDoc,
+  focusTopic, setFocusTopic,
+  numDocQuestions, setNumDocQuestions,
+  onStartDoc, isGenerating, genError,
+}) {
+  const selectedDocName = documents.find(d => d.id === selectedDoc)?.name || '';
+
   return (
     <div className="quiz-setup">
       <div className="quiz-card">
-        <div style={{ fontSize: '2.5rem', textAlign: 'center', marginBottom: '8px' }}>🧠</div>
         <h2>Start a Quiz</h2>
-        <p className="subtitle">Test your knowledge and track your progress</p>
+        <p className="subtitle">Choose a source for your quiz questions</p>
 
-        <div className="form-group">
-          <label>Subject</label>
-          <select
-            className="form-control"
-            value={config.subject}
-            onChange={e => setConfig({ ...config, subject: e.target.value, topic: '' })}
+        {/* Source toggle */}
+        <div className="source-toggle">
+          <button
+            className={`source-btn ${quizSource === 'topic' ? 'active' : ''}`}
+            onClick={() => setQuizSource('topic')}
           >
-            <option value="">Select a subject...</option>
-            {subjects.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+            <HiOutlineAcademicCap />
+            <span>By Topic</span>
+            <small>Built-in question bank</small>
+          </button>
+          <button
+            className={`source-btn ${quizSource === 'document' ? 'active' : ''}`}
+            onClick={() => setQuizSource('document')}
+          >
+            <HiOutlineDocumentText />
+            <span>From Document</span>
+            <small>AI generates from your notes</small>
+          </button>
         </div>
 
-        <div className="form-group">
-          <label>Topic</label>
-          <select
-            className="form-control"
-            value={config.topic}
-            onChange={e => setConfig({ ...config, topic: e.target.value })}
-            disabled={!config.subject}
-          >
-            <option value="">Select a topic...</option>
-            {topics.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </div>
+        {quizSource === 'topic' ? (
+          <>
+            <div className="form-group">
+              <label>Subject</label>
+              <select
+                className="form-control"
+                value={config.subject}
+                onChange={e => setConfig({ ...config, subject: e.target.value, topic: '' })}
+              >
+                <option value="">Select a subject...</option>
+                {subjects.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Topic</label>
+              <select
+                className="form-control"
+                value={config.topic}
+                onChange={e => setConfig({ ...config, topic: e.target.value })}
+                disabled={!config.subject}
+              >
+                <option value="">Select a topic...</option>
+                {topics.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Number of Questions</label>
+              <select
+                className="form-control"
+                value={config.numQuestions}
+                onChange={e => setConfig({ ...config, numQuestions: parseInt(e.target.value) })}
+              >
+                <option value={3}>3 Questions</option>
+                <option value={5}>5 Questions</option>
+                <option value={10}>10 Questions</option>
+              </select>
+            </div>
+            <button
+              className="btn btn-primary btn-lg"
+              style={{ width: '100%', justifyContent: 'center' }}
+              onClick={onStartTopic}
+              disabled={!config.subject || !config.topic}
+            >
+              <HiOutlineLightningBolt /> Start Quiz
+            </button>
+          </>
+        ) : (
+          <>
+            {documents.length === 0 ? (
+              <div style={{
+                textAlign: 'center', padding: '32px 20px',
+                background: 'var(--bg-glass)', borderRadius: 'var(--radius-lg)',
+                border: '1px dashed var(--border-color)', marginBottom: '20px',
+              }}>
+                <HiOutlineDocumentText style={{ fontSize: '2.5rem', color: 'var(--text-muted)', marginBottom: 8 }} />
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: 8 }}>
+                  No documents uploaded yet.
+                </p>
+                <a href="/documents" className="btn btn-secondary btn-sm">Upload Documents</a>
+              </div>
+            ) : (
+              <>
+                <div className="form-group">
+                  <label>Select Document</label>
+                  <select
+                    className="form-control"
+                    value={selectedDoc}
+                    onChange={e => setSelectedDoc(e.target.value)}
+                  >
+                    <option value="">Choose a document...</option>
+                    {documents.map(d => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.chunks} chunks)
+                      </option>
+                    ))}
+                  </select>
+                  {selectedDocName && (
+                    <div style={{
+                      marginTop: 8, padding: '8px 12px',
+                      background: 'rgba(123,97,255,0.08)',
+                      border: '1px solid rgba(123,97,255,0.2)',
+                      borderRadius: 'var(--radius-sm)',
+                      fontSize: '0.78rem', color: 'var(--accent-primary)',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                    }}>
+                      <HiOutlineDocumentText /> Questions will be generated from: <strong>{selectedDocName}</strong>
+                    </div>
+                  )}
+                </div>
 
-        <div className="form-group">
-          <label>Number of Questions</label>
-          <select
-            className="form-control"
-            value={config.numQuestions}
-            onChange={e => setConfig({ ...config, numQuestions: parseInt(e.target.value) })}
-          >
-            <option value={3}>3 Questions</option>
-            <option value={5}>5 Questions</option>
-            <option value={10}>10 Questions (All)</option>
-          </select>
-        </div>
+                <div className="form-group">
+                  <label>Focus Topic <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none' }}>(optional — narrow down questions)</span></label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. Chapter 3, Newton's Laws, Data Types..."
+                    value={focusTopic}
+                    onChange={e => setFocusTopic(e.target.value)}
+                  />
+                </div>
 
-        <button
-          className="btn btn-primary btn-lg"
-          style={{ width: '100%', justifyContent: 'center' }}
-          onClick={onStart}
-          disabled={!config.subject || !config.topic}
-        >
-          <HiOutlineLightningBolt /> Start Quiz
-        </button>
+                <div className="form-group">
+                  <label>Number of Questions</label>
+                  <select
+                    className="form-control"
+                    value={numDocQuestions}
+                    onChange={e => setNumDocQuestions(parseInt(e.target.value))}
+                  >
+                    <option value={3}>3 Questions</option>
+                    <option value={5}>5 Questions</option>
+                    <option value={8}>8 Questions</option>
+                    <option value={10}>10 Questions</option>
+                  </select>
+                </div>
+
+                {genError && (
+                  <div style={{
+                    padding: '12px 16px', marginBottom: 16,
+                    background: 'rgba(255,75,110,0.1)', border: '1px solid rgba(255,75,110,0.3)',
+                    borderRadius: 'var(--radius-md)', fontSize: '0.85rem', color: 'var(--accent-danger)',
+                  }}>
+                    {genError}
+                  </div>
+                )}
+
+                <button
+                  className="btn btn-primary btn-lg"
+                  style={{ width: '100%', justifyContent: 'center' }}
+                  onClick={onStartDoc}
+                  disabled={!selectedDoc || isGenerating}
+                >
+                  {isGenerating
+                    ? <><HiOutlineRefresh style={{ animation: 'spin 1s linear infinite' }} /> Generating from document...</>
+                    : <><HiOutlineLightningBolt /> Generate Quiz from Document</>
+                  }
+                </button>
+
+                <p style={{ textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 12 }}>
+                  AI will read your uploaded document and create questions from it
+                </p>
+              </>
+            )}
+          </>
+        )}
       </div>
+
+      <style>{`
+        .source-toggle {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+          margin-bottom: 24px;
+        }
+        .source-btn {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
+          padding: 16px 12px;
+          border-radius: var(--radius-md);
+          border: 2px solid var(--border-color);
+          background: var(--bg-glass);
+          color: var(--text-secondary);
+          cursor: pointer;
+          font-family: var(--font-body);
+          transition: all var(--transition-normal);
+        }
+        .source-btn svg { font-size: 1.5rem; margin-bottom: 2px; }
+        .source-btn span { font-size: 0.88rem; font-weight: 600; color: var(--text-primary); }
+        .source-btn small { font-size: 0.7rem; color: var(--text-muted); }
+        .source-btn:hover { border-color: var(--border-accent); background: rgba(123,97,255,0.07); }
+        .source-btn.active {
+          border-color: var(--accent-primary);
+          background: rgba(123,97,255,0.12);
+          color: var(--accent-primary);
+        }
+        .source-btn.active span { color: var(--accent-primary); }
+        [data-theme="light"] .source-btn.active {
+          border-color: var(--accent-primary);
+          background: rgba(228,61,18,0.08);
+          color: var(--accent-primary);
+        }
+        [data-theme="light"] .source-btn.active span { color: var(--accent-primary); }
+      `}</style>
     </div>
   );
 }
@@ -462,7 +696,14 @@ function QuizInterface({ quiz, currentQuestion, setCurrentQuestion, answers, onA
 
       <div className="question-container">
         <div className="question-header">
-          <span className="question-number">Question {currentQuestion + 1} of {quiz.totalQuestions}</span>
+          <span className="question-number">
+          Question {currentQuestion + 1} of {quiz.totalQuestions}
+          {quiz.sourceDoc && (
+            <span style={{ marginLeft: 8, color: 'var(--accent-primary)', fontSize: '0.72rem', fontWeight: 600 }}>
+              · {quiz.sourceDoc}
+            </span>
+          )}
+        </span>
           <div
             className="question-timer"
             style={{
@@ -563,8 +804,13 @@ function QuizResults({ result, onRetry }) {
 
       <div className="card">
         <div className="section-title">Detailed Results</div>
-        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {result.subject} → {result.topic} • {result.score}/{result.totalQuestions} correct
+          {result.sourceDoc && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--accent-primary)', background: 'rgba(123,97,255,0.1)', padding: '2px 8px', borderRadius: 99 }}>
+              <HiOutlineDocumentText style={{ fontSize: '0.85rem' }} /> {result.sourceDoc}
+            </span>
+          )}
         </div>
         <div className="result-details">
           {result.results.map((r, i) => (

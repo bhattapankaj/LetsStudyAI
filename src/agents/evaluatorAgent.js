@@ -169,6 +169,7 @@ export const evaluatorAgent = {
       quizId: quiz.id,
       subject: quiz.subject,
       topic: quiz.topic,
+      sourceDoc: quiz.sourceDoc || null,
       score,
       totalQuestions: quiz.questions.length,
       percentage,

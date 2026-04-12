@@ -142,6 +142,13 @@ function getTotalChunks() {
   return documents.length;
 }
 
+// Return all text chunks for a specific document (used for document-based quiz generation)
+function getDocumentChunks(docId) {
+  return documents
+    .filter(d => d.docId === docId)
+    .map(({ id, docId, docName, text }) => ({ id, docId, docName, text }));
+}
+
 const STOPWORDS = new Set([
   'the','is','are','was','were','be','been','being','have','has','had','do','does','did',
   'will','would','could','should','may','might','shall','can','need','dare','ought','used',
@@ -153,4 +160,4 @@ const STOPWORDS = new Set([
   'no','only','own','same','too','very','here','there','as','if','while','although',
 ]);
 
-module.exports = { addChunks, removeDocument, search, getDocumentList, getTotalChunks };
+module.exports = { addChunks, removeDocument, search, getDocumentList, getTotalChunks, getDocumentChunks };

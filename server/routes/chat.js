@@ -1,6 +1,7 @@
 const express = require('express');
 const Groq = require('groq-sdk');
 const { buildMessages, getRagContext } = require('../rag/ragEngine');
+const { getDocumentChunks, getDocumentList } = require('../rag/vectorStore');
 
 const router = express.Router();
 
@@ -72,21 +73,57 @@ router.post('/', async (req, res) => {
 });
 
 // POST /api/chat/generate-quiz
+// Supports two modes:
+//   1. documentId + focusTopic → generate from uploaded document (RAG-based)
+//   2. topic + subject          → generate from topic name (generic AI)
 router.post('/generate-quiz', async (req, res) => {
-  const { topic, subject, numQuestions = 5 } = req.body;
+  const { topic, subject, numQuestions = 5, documentId, focusTopic } = req.body;
 
   const client = getGroqClient();
   if (!client) {
     return res.status(503).json({ error: 'GROQ_API_KEY is not configured.' });
   }
 
-  const { chunks } = await getRagContext(`${subject} ${topic} questions quiz`);
+  let contextText = '';
+  let quizTopic = topic || focusTopic || 'the document';
+  let quizSubject = subject || 'Study Notes';
+  let sourceDoc = null;
 
-  const contextText = chunks.length > 0
-    ? `Based on these student notes:\n${chunks.map(c => c.text).join('\n\n')}\n\n`
+  if (documentId) {
+    // Document mode: pull ALL chunks from the selected document
+    const docChunks = getDocumentChunks(documentId);
+    if (docChunks.length === 0) {
+      return res.status(404).json({ error: 'Document not found or has no indexed content.' });
+    }
+
+    sourceDoc = docChunks[0].docName;
+    quizTopic = focusTopic || sourceDoc;
+    quizSubject = 'Document Quiz';
+
+    // Use up to 6000 chars of content to stay within token limits
+    const allText = docChunks.map(c => c.text).join('\n\n');
+    const trimmed = allText.length > 6000 ? allText.slice(0, 6000) + '...' : allText;
+
+    contextText = `You are generating quiz questions STRICTLY based on the following document content.\n\nDocument: "${sourceDoc}"\n\nContent:\n${trimmed}\n\n`;
+  } else {
+    // Topic mode: do a RAG search for context if available
+    const { chunks } = await getRagContext(`${subject} ${topic} questions quiz`);
+    if (chunks.length > 0) {
+      contextText = `Use these relevant student notes as additional context:\n${chunks.map(c => c.text).join('\n\n')}\n\n`;
+    }
+  }
+
+  const focusLine = focusTopic
+    ? `Focus specifically on the subtopic: "${focusTopic}".`
     : '';
 
-  const prompt = `${contextText}Generate exactly ${numQuestions} multiple-choice quiz questions about "${topic}" in ${subject}.
+  const prompt = `${contextText}Generate exactly ${numQuestions} multiple-choice quiz questions${documentId ? ' based ONLY on the document content above' : ` about "${quizTopic}" in ${quizSubject}`}. ${focusLine}
+
+Rules:
+- All questions and answers must come from the provided content only (if document mode)
+- Each question must have exactly 4 answer options
+- Only one option should be correct
+- The explanation must reference the content
 
 Return ONLY a valid JSON array with this exact structure:
 [
@@ -94,7 +131,7 @@ Return ONLY a valid JSON array with this exact structure:
     "question": "Question text here?",
     "options": ["Option A", "Option B", "Option C", "Option D"],
     "correct": 0,
-    "explanation": "Why this answer is correct"
+    "explanation": "Why this answer is correct, referencing the document"
   }
 ]
 
@@ -102,25 +139,24 @@ The "correct" field is the 0-based index of the correct option. Return only the 
 
   try {
     const completion = await client.chat.completions.create({
-      model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
+      model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
       messages: [
         { role: 'system', content: 'You are a quiz generator. You output ONLY valid JSON arrays. No markdown, no explanation, just the JSON array.' },
         { role: 'user', content: prompt },
       ],
-      temperature: 0.6,
-      max_tokens: 2048,
+      temperature: 0.5,
+      max_tokens: 3000,
     });
 
     const raw = completion.choices[0]?.message?.content || '[]';
 
-    // Extract JSON from the response (in case the model adds extra text)
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
       return res.status(500).json({ error: 'Failed to parse quiz from AI response.' });
     }
 
     const questions = JSON.parse(jsonMatch[0]);
-    res.json({ questions, topic, subject });
+    res.json({ questions, topic: quizTopic, subject: quizSubject, sourceDoc });
   } catch (err) {
     console.error('Quiz generation error:', err);
     res.status(500).json({ error: 'Failed to generate quiz. Please try again.' });
