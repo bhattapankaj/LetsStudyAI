@@ -1,62 +1,98 @@
-# LetsStudyAI — AI-Powered Personal Study Assistant
+# LetsStudyAI — AI-Powered Study Assistant
 
-A multi-agent AI study assistant using RAG (Retrieval Augmented Generation) so students can upload their own notes and get AI-powered answers from them.
+This is our course project for CSCI 4083. We built an AI study assistant that uses multiple agents to help students plan their study schedule, understand topics, and test themselves — all powered by their own uploaded notes.
 
-## Features
+The big idea: upload your PDF or Word notes, and the AI will answer your questions from them, not just generic stuff.
 
-- **Planner Agent** — generates personalized study schedules from your subjects and deadlines
-- **Tutor Agent** — answers questions using your uploaded notes (RAG) via Groq LLM
-- **Evaluator Agent** — quizzes you on topics and tracks your performance
-- **My Documents** — upload PDF, DOCX, or TXT notes to power the AI Tutor
+---
 
-## Quick Start
+## What It Does
 
-### 1. Get a free Groq API key
+The app has three AI agents, each doing a different job:
 
-Sign up at [console.groq.com](https://console.groq.com) — no credit card required.
+- **Planner Agent** — you add your subjects and deadlines, it builds a study schedule for you
+- **Tutor Agent** — you ask it questions, it answers using your uploaded notes (RAG)
+- **Evaluator Agent** — it generates quiz questions either by topic or directly from your documents
 
-### 2. Configure the backend
+There's also a Documents page where you upload your notes (PDF, DOCX, or TXT) so the AI has something to work with.
+
+---
+
+## How to Run It
+
+You need two terminals — one for the backend and one for the frontend.
+
+### Step 1 — Get a free Groq API key
+
+Go to [console.groq.com](https://console.groq.com) and sign up. It's completely free, no credit card needed. Copy your API key.
+
+### Step 2 — Set up the backend
 
 ```bash
 cd server
 cp .env.example .env
-# Edit server/.env and paste your Groq API key
 ```
 
-### 3. Start the backend
+Open `server/.env` and paste your Groq API key where it says `GROQ_API_KEY=`.
+
+### Step 3 — Start the backend
 
 ```bash
 cd server
 npm install
 npm start
-# Runs on http://localhost:3001
 ```
 
-### 4. Start the frontend (in a new terminal)
+It runs on `http://localhost:3001`
+
+### Step 4 — Start the frontend (open a new terminal)
 
 ```bash
 npm install
 npm run dev
-# Runs on http://localhost:5173
 ```
+
+It runs on `http://localhost:5173` — open that in your browser.
+
+---
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
+| Part | What we used |
+|------|-------------|
 | Frontend | React 19, Vite, Framer Motion |
 | Backend | Node.js, Express |
-| LLM | Groq API (llama-3.1-8b-instant) |
-| RAG | TF-IDF cosine similarity (in-memory) |
-| Document parsing | pdf-parse, mammoth |
+| AI / LLM | Groq API (Llama 3) — free |
+| Document Search (RAG) | TF-IDF + cosine similarity |
+| File Parsing | pdf-parse (PDF), mammoth (DOCX) |
 
-## Project Team
+We chose Groq because it's fast and free. We built the RAG system from scratch using TF-IDF instead of using a vector database, which kept things simple and didn't require any extra services.
+
+---
+
+## Project Structure
+
+```
+LetsStudyAI/
+├── src/                    # React frontend
+│   ├── agents/             # Planner, Tutor, Evaluator agent logic
+│   ├── pages/              # Dashboard, Planner, Tutor, Evaluator, Documents, Profile
+│   └── context/            # App state (AppContext), Theme (ThemeContext)
+├── server/                 # Express backend
+│   ├── routes/             # chat.js, documents.js
+│   └── rag/                # documentParser.js, vectorStore.js, ragEngine.js
+└── README.md
+```
+
+---
+
+## Team
 
 | Name | Role |
 |------|------|
-| Pankaj Bhatta | Tutor Agent + Backend/RAG |
-| Ranjan Lamichhane | System Design + Integration |
+| Pankaj Bhatta | Tutor Agent + RAG backend |
+| Ranjan Lamichhane | System design + integration |
 | Aadarsha Aryal | Planner Agent |
 | Diwakar Mahato Sudi | Evaluator Agent |
 
-CSCI 4083 — Dr. Dileon Saint Jean
+**Course:** CSCI 4083 — Dr. Dileon Saint Jean
