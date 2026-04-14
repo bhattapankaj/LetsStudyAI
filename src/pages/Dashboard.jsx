@@ -83,8 +83,8 @@ export default function Dashboard() {
         />
         <StatCard
           icon={<HiOutlineCheckCircle />}
-          value={`${completedTasks}/${totalTasks}`}
-          label="Tasks Completed"
+          value={totalTasks > 0 ? `${Math.round((completedTasks / totalTasks) * 100)}%` : '—'}
+          label="Plan Progress"
           color="var(--accent-success)"
           gradient="var(--gradient-success)"
         />
@@ -370,7 +370,7 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({ icon, value, label, color, gradient }) {
+function StatCard({ icon, value, label, color }) {
   return (
     <div className="stat-card" style={{ '--card-color': color }}>
       <div className="stat-icon" style={{ background: `${color}15`, color }}>
