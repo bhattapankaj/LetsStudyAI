@@ -20,38 +20,50 @@ There's also a Documents page where you upload your notes (PDF, DOCX, or TXT) so
 
 ## How to Run It
 
-You need **PostgreSQL** running locally (or set `DATABASE_URL` to any Postgres you control), plus two terminals — backend and frontend.
+You need:
+- Docker Desktop (recommended for Postgres), or any Postgres server
+- Node.js + npm
+- Two terminals (backend + frontend)
 
-### Step 0 — PostgreSQL
-
-Create a database (example name `letsstudyai`). Quick option with Docker:
+### Step 0 — Start PostgreSQL (Docker)
 
 ```bash
-docker run --name letsstudyai-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=letsstudyai -p 5432:5432 -d postgres:16
+docker run --name letsstudyai-pg \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=letsstudyai \
+  -p 5432:5432 \
+  -d postgres:16
 ```
 
-Then set `DATABASE_URL` in `server/.env` (see Step 2).
+If the container already exists, start it with:
+
+```bash
+docker start letsstudyai-pg
+```
+
+Optional quick DB check:
+
+```bash
+docker exec -it letsstudyai-pg psql -U postgres -d letsstudyai -c "\dt"
+```
 
 ### Step 1 — Get a free Groq API key
 
-Go to [console.groq.com](https://console.groq.com) and sign up. It's completely free, no credit card needed. Copy your API key.
+Go to [console.groq.com](https://console.groq.com) and create an API key.
 
-### Step 2 — Set up the backend
+### Step 2 — Configure backend environment
 
 ```bash
 cd server
 cp .env.example .env
 ```
 
-Open `server/.env` and set:
+Edit `server/.env` and set:
+- `DATABASE_URL` (example: `postgres://postgres:postgres@localhost:5432/letsstudyai`)
+- `JWT_SECRET` (random string, at least 16 chars)
+- `GROQ_API_KEY` (required for AI features)
 
-- **`DATABASE_URL`** — e.g. `postgres://postgres:postgres@localhost:5432/letsstudyai`
-- **`JWT_SECRET`** — any random string **at least 16 characters** (used to sign login tokens)
-- **`GROQ_API_KEY`** — optional but needed for AI tutor / planner / quizzes
-
-The server creates tables on first start.
-
-### Step 3 — Start the backend
+### Step 3 — Start backend
 
 ```bash
 cd server
@@ -59,16 +71,22 @@ npm install
 npm start
 ```
 
-It runs on `http://localhost:3001`
+Backend runs at `http://localhost:3001` and auto-creates DB tables on startup.
 
-### Step 4 — Start the frontend (open a new terminal)
+### Step 4 — Start frontend (new terminal)
 
 ```bash
 npm install
 npm run dev
 ```
 
-It runs on `http://localhost:5173` — open that in your browser. **Register** a new account on first visit (your study plan, chat, and profile are stored per user in Postgres).
+Frontend runs at `http://localhost:5173`.
+
+### Step 5 — First use
+
+1. Register a new account.
+2. Upload documents in **Documents** page.
+3. Use Tutor with the document selector (Tutor only answers from the selected document).
 
 ---
 
@@ -84,6 +102,12 @@ It runs on `http://localhost:5173` — open that in your browser. **Register** a
 | File Parsing | pdf-parse (PDF), mammoth (DOCX) |
 
 We chose Groq because it's fast and free. We built the RAG system from scratch using TF-IDF instead of using a vector database, which kept things simple and didn't require any extra services.
+
+### Current Tutor behavior
+
+- Tutor is **document-only** (no offline predefined knowledge mode)
+- You must pick an uploaded document in Tutor chat
+- The selected `documentId` is sent to backend and retrieval is scoped to that document only
 
 ---
 
