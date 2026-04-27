@@ -47,9 +47,11 @@ Optional quick DB check:
 docker exec -it letsstudyai-pg psql -U postgres -d letsstudyai -c "\dt"
 ```
 
-### Step 1 — Get a free Groq API key
+### Step 1 — Get provider API keys
 
-Go to [console.groq.com](https://console.groq.com) and create an API key.
+- Groq: [console.groq.com](https://console.groq.com)
+- Gemini: [aistudio.google.com](https://aistudio.google.com)
+- OpenRouter (free models available): [openrouter.ai](https://openrouter.ai)
 
 ### Step 2 — Configure backend environment
 
@@ -61,7 +63,19 @@ cp .env.example .env
 Edit `server/.env` and set:
 - `DATABASE_URL` (example: `postgres://postgres:postgres@localhost:5432/letsstudyai`)
 - `JWT_SECRET` (random string, at least 16 chars)
-- `GROQ_API_KEY` (required for AI features)
+- Provider API keys:
+  - `GROQ_API_KEY`
+  - `GEMINI_API_KEY`
+  - `OPENROUTER_API_KEY`
+- Provider/model per agent:
+  - `AI_PROVIDER_TUTOR` + `AI_MODEL_TUTOR`
+  - `AI_PROVIDER_PLANNER` + `AI_MODEL_PLANNER`
+  - `AI_PROVIDER_EVALUATOR` + `AI_MODEL_EVALUATOR`
+
+Example free-tier friendly 3-provider setup:
+- `AI_PROVIDER_TUTOR=groq` and `AI_MODEL_TUTOR=llama-3.1-8b-instant`
+- `AI_PROVIDER_PLANNER=gemini` and `AI_MODEL_PLANNER=gemini-1.5-flash`
+- `AI_PROVIDER_EVALUATOR=openrouter` and `AI_MODEL_EVALUATOR=meta-llama/llama-3.1-8b-instruct:free`
 
 ### Step 3 — Start backend
 
@@ -97,11 +111,11 @@ Frontend runs at `http://localhost:5173`.
 | Frontend | React 19, Vite, Framer Motion |
 | Backend | Node.js, Express |
 | Accounts | JWT + bcrypt, PostgreSQL (`users`, `user_app_state`, `user_documents`) |
-| AI / LLM | Groq API (Llama 3) — free |
+| AI / LLM | Multi-provider: Groq, Gemini, OpenRouter |
 | Document Search (RAG) | TF-IDF + cosine similarity |
 | File Parsing | pdf-parse (PDF), mammoth (DOCX) |
 
-We chose Groq because it's fast and free. We built the RAG system from scratch using TF-IDF instead of using a vector database, which kept things simple and didn't require any extra services.
+We use a multi-provider setup (Groq, Gemini, OpenRouter) so each agent can use a different model/provider as needed, including free-tier options. We built the RAG system from scratch using TF-IDF instead of using a vector database, which kept things simple and didn't require any extra services.
 
 ### Current Tutor behavior
 

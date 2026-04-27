@@ -4,10 +4,12 @@ const cors = require('cors');
 
 const { initSchema } = require('./db/initSchema');
 const { getPool } = require('./db/pool');
+const { getTaskAiConfig, isProviderConfigured } = require('./services/aiConfig');
 
 const chatRouter = require('./routes/chat');
 const documentsRouter = require('./routes/documents');
 const plannerRouter = require('./routes/planner');
+const workflowRouter = require('./routes/workflow');
 const authRouter = require('./routes/auth');
 const userStateRouter = require('./routes/userState');
 
@@ -36,9 +38,20 @@ app.use('/api/user', userStateRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/documents', documentsRouter);
 app.use('/api/planner', plannerRouter);
+app.use('/api/workflow', workflowRouter);
 
 app.get('/api/health', async (req, res) => {
-  const hasApiKey = !!(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'your_groq_api_key_here');
+  const tutorConfig = getTaskAiConfig('tutor');
+  const plannerConfig = getTaskAiConfig('planner');
+  const evaluatorConfig = getTaskAiConfig('evaluator');
+
+  const ai = {
+    tutor: { ...tutorConfig, configured: isProviderConfigured(tutorConfig.provider) },
+    planner: { ...plannerConfig, configured: isProviderConfigured(plannerConfig.provider) },
+    evaluator: { ...evaluatorConfig, configured: isProviderConfigured(evaluatorConfig.provider) },
+  };
+
+  const allAiConfigured = Object.values(ai).every(cfg => cfg.configured);
   let database = false;
   try {
     await getPool().query('SELECT 1');
@@ -48,12 +61,12 @@ app.get('/api/health', async (req, res) => {
   }
   res.json({
     status: 'ok',
-    groqConfigured: hasApiKey,
+    ai,
+    aiConfigured: allAiConfigured,
     database,
-    model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
-    message: hasApiKey
-      ? 'Server is ready. Groq API key is configured.'
-      : 'Server running but GROQ_API_KEY is not set. Add it to server/.env',
+    message: allAiConfigured
+      ? 'Server is ready. AI providers are configured.'
+      : 'Server running but one or more provider API keys are missing. Update server/.env',
   });
 });
 
@@ -69,11 +82,13 @@ async function start() {
   app.listen(PORT, () => {
     console.log(`\n LetsStudyAI backend running on http://localhost:${PORT}`);
     console.log(` Health check: http://localhost:${PORT}/api/health`);
-    if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'your_groq_api_key_here') {
-      console.log('\n  WARNING: GROQ_API_KEY is not set! Get a free key at https://console.groq.com\n');
-    } else {
-      console.log(' Groq API key loaded. AI features are active!\n');
-    }
+    const tutorConfig = getTaskAiConfig('tutor');
+    const plannerConfig = getTaskAiConfig('planner');
+    const evaluatorConfig = getTaskAiConfig('evaluator');
+    console.log(` Tutor -> ${tutorConfig.provider}:${tutorConfig.model}`);
+    console.log(` Planner -> ${plannerConfig.provider}:${plannerConfig.model}`);
+    console.log(` Evaluator -> ${evaluatorConfig.provider}:${evaluatorConfig.model}`);
+    console.log(' Add provider API keys in server/.env if any agent is not configured.\n');
   });
 }
 

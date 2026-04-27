@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import { tutorAgent } from "../agents/tutorAgent";
 import { motion } from "framer-motion";
@@ -8,17 +9,27 @@ import {
   HiOutlineSparkles,
   HiOutlineExclamationCircle,
   HiOutlineAcademicCap,
+  HiOutlineUpload,
 } from "react-icons/hi";
 import { apiFetch, API_ORIGIN } from "../lib/api";
 
 export default function Tutor() {
   const { state, dispatch } = useApp();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [backendStatus, setBackendStatus] = useState(null); // null | { groqConfigured, docCount, model }
   const [documents, setDocuments] = useState([]);
   const [selectedDocId, setSelectedDocId] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
   const chatEndRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const workflowStatus = {
+    plannerReady: state.studyPlan.length > 0,
+    tutorReady: state.chatHistory.some(m => m.role === "assistant"),
+    evaluatorReady: Boolean(state.currentQuiz) || state.quizHistory.length > 0,
+  };
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -27,6 +38,14 @@ export default function Tutor() {
   useEffect(() => {
     checkBackend();
   }, []);
+
+  useEffect(() => {
+    const starter = location.state?.starterQuestion;
+    if (starter) {
+      setMessage(starter);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
 
   async function checkBackend() {
     try {
@@ -43,14 +62,51 @@ export default function Tutor() {
         return docList[0]?.id || "";
       });
       setBackendStatus({
-        groqConfigured: health.groqConfigured,
+        groqConfigured: Boolean(health.groqConfigured ?? health.ai?.tutor?.configured),
         docCount: docList.length,
-        model: health.model,
+        model: health.model || health.ai?.tutor?.model || "unknown-model",
       });
     } catch {
       setBackendStatus(null);
       setDocuments([]);
       setSelectedDocId("");
+    }
+  }
+
+  async function uploadFromTutor(file) {
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("document", file);
+      const res = await apiFetch("/api/documents/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      await checkBackend();
+      if (data?.document?.id) setSelectedDocId(data.document.id);
+      dispatch({
+        type: "ADD_CHAT_MESSAGE",
+        payload: {
+          id: Date.now() + 1,
+          role: "assistant",
+          text: `Document uploaded successfully: **${data.document.name}**. You can ask questions about it now.`,
+          type: "info",
+          time: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      dispatch({
+        type: "ADD_CHAT_MESSAGE",
+        payload: {
+          id: Date.now() + 1,
+          role: "assistant",
+          text: `**Upload failed:** ${err.message || "Please try again."}`,
+          type: "error",
+          time: new Date().toISOString(),
+        },
+      });
+    } finally {
+      setIsUploading(false);
     }
   }
 
@@ -131,6 +187,36 @@ export default function Tutor() {
         <p className="subtitle">Strict document-only tutor. Answers come only from your uploaded notes.</p>
       </div>
 
+      <div className="card" style={{ marginBottom: 12, padding: "10px 14px" }}>
+        <div style={{ fontSize: "0.78rem", fontWeight: 700, marginBottom: 8 }}>
+          Connected Agent Workflow
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+          <span className="chip" style={{ background: workflowStatus.plannerReady ? "rgba(0,230,118,0.12)" : "var(--bg-glass)" }}>
+            1. Planner {workflowStatus.plannerReady ? "✓" : "..."}
+          </span>
+          <span className="chip" style={{ background: workflowStatus.tutorReady ? "rgba(0,230,118,0.12)" : "var(--bg-glass)" }}>
+            2. Tutor {workflowStatus.tutorReady ? "✓" : "..."}
+          </span>
+          <span className="chip" style={{ background: workflowStatus.evaluatorReady ? "rgba(0,230,118,0.12)" : "var(--bg-glass)" }}>
+            3. Evaluator {workflowStatus.evaluatorReady ? "✓" : "..."}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+          <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+            Ask Tutor using your plan, then continue to Evaluator quiz.
+          </span>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => navigate("/planner")}>
+              Back to Planner
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={() => navigate("/evaluator")} disabled={!state.currentQuiz}>
+              Go to Evaluator
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="card" style={{ marginBottom: 20, padding: "12px 18px" }}>
         <div
           style={{
@@ -172,22 +258,39 @@ export default function Tutor() {
         <label style={{ display: "block", fontSize: "0.82rem", marginBottom: 6, color: "var(--text-muted)" }}>
           Active document for Tutor chat
         </label>
-        <select
-          className="form-control"
-          value={selectedDocId}
-          onChange={(e) => setSelectedDocId(e.target.value)}
-          disabled={isLoading || documents.length === 0}
-        >
-          {documents.length === 0 ? (
-            <option value="">No documents available</option>
-          ) : (
-            documents.map((doc) => (
-              <option key={doc.id} value={doc.id}>
-                {doc.name}
-              </option>
-            ))
-          )}
-        </select>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <select
+            className="form-control"
+            value={selectedDocId}
+            onChange={(e) => setSelectedDocId(e.target.value)}
+            disabled={isLoading || documents.length === 0}
+            style={{ flex: 1, minWidth: 220 }}
+          >
+            {documents.length === 0 ? (
+              <option value="">No documents available</option>
+            ) : (
+              documents.map((doc) => (
+                <option key={doc.id} value={doc.id}>
+                  {doc.name}
+                </option>
+              ))
+            )}
+          </select>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx,.doc,.txt,.md"
+            style={{ display: "none" }}
+            onChange={(e) => uploadFromTutor(e.target.files?.[0])}
+          />
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading || isLoading}
+          >
+            <HiOutlineUpload /> {isUploading ? "Uploading..." : "Upload Here"}
+          </button>
+        </div>
       </div>
 
       <div className="chat-container">

@@ -1,20 +1,108 @@
 const express = require('express');
-const Groq = require('groq-sdk');
 const { requireAuth } = require('../middleware/auth');
+const { generateForTask } = require('../services/aiClient');
 
 const router = express.Router();
 
 router.use(requireAuth);
 
-let groq = null;
+const MAX_DAILY_HOURS = 6;
 
-function getGroqClient() {
-  if (!groq) {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey || apiKey === 'your_groq_api_key_here') return null;
-    groq = new Groq({ apiKey });
+function toIsoDate(date) {
+  return new Date(date).toISOString().split('T')[0];
+}
+
+function addDays(isoDate, days) {
+  const date = new Date(`${isoDate}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return toIsoDate(date);
+}
+
+function getHoursByPriority(priority) {
+  if (priority === 'high') return 3;
+  if (priority === 'low') return 1;
+  return 2;
+}
+
+function normalizeTask(rawTask, index, subjectsById, todayStr) {
+  const subject = subjectsById.get(rawTask.subjectId);
+  if (!subject) return null;
+
+  const rawDate = rawTask.date || todayStr;
+  const boundedDate = rawDate < todayStr ? todayStr : rawDate;
+  const date = subject.deadline && boundedDate > subject.deadline ? subject.deadline : boundedDate;
+  const priority = rawTask.priority || subject.priority || 'medium';
+  const duration = Number(rawTask.duration) > 0 ? Number(rawTask.duration) : getHoursByPriority(priority);
+
+  return {
+    id: rawTask.id || `${subject.id}-${index}`,
+    subjectId: subject.id,
+    subjectName: subject.name,
+    topic: rawTask.topic || subject.topics?.[0] || 'Study Session',
+    date,
+    duration,
+    priority,
+    completed: Boolean(rawTask.completed),
+    type: rawTask.type === 'revision' ? 'revision' : 'study',
+    color: rawTask.color || subject.color || '#6366f1',
+  };
+}
+
+function balanceDailyHours(tasks, subjectsById, todayStr) {
+  const usage = new Map();
+
+  for (const task of tasks) {
+    const used = usage.get(task.date) || 0;
+    if (used + task.duration <= MAX_DAILY_HOURS) {
+      usage.set(task.date, used + task.duration);
+      continue;
+    }
+
+    const subject = subjectsById.get(task.subjectId);
+    const hardStop = subject?.deadline || addDays(todayStr, 30);
+    let candidate = task.date;
+    let assigned = false;
+
+    while (candidate <= hardStop) {
+      const dayUsed = usage.get(candidate) || 0;
+      if (dayUsed + task.duration <= MAX_DAILY_HOURS) {
+        task.date = candidate;
+        usage.set(candidate, dayUsed + task.duration);
+        assigned = true;
+        break;
+      }
+      candidate = addDays(candidate, 1);
+    }
+
+    if (!assigned) {
+      // Keep task on original date as a last resort, but cap duration.
+      task.duration = Math.max(1, MAX_DAILY_HOURS - (usage.get(task.date) || 0));
+      usage.set(task.date, (usage.get(task.date) || 0) + task.duration);
+    }
   }
-  return groq;
+}
+
+function ensureRevisionTasks(tasks, subjects, todayStr) {
+  for (const subject of subjects) {
+    const hasRevision = tasks.some(
+      t => t.subjectId === subject.id && t.type === 'revision'
+    );
+    if (hasRevision) continue;
+
+    const revisionDate = subject.deadline ? addDays(subject.deadline, -1) : addDays(todayStr, 1);
+    tasks.push({
+      id: `${subject.id}-revision`,
+      subjectId: subject.id,
+      subjectName: subject.name,
+      topic: `${subject.name} Revision`,
+      date: revisionDate < todayStr ? todayStr : revisionDate,
+      duration: 1,
+      priority: subject.priority || 'medium',
+      completed: false,
+      type: 'revision',
+      color: subject.color || '#6366f1',
+    });
+  }
 }
 
 // POST /api/planner/generate
@@ -24,11 +112,6 @@ router.post('/generate', async (req, res) => {
 
   if (!subjects || !Array.isArray(subjects) || subjects.length === 0) {
     return res.status(400).json({ error: 'subjects array is required' });
-  }
-
-  const client = getGroqClient();
-  if (!client) {
-    return res.status(503).json({ error: 'GROQ_API_KEY not configured', fallback: true });
   }
 
   const today = new Date();
@@ -55,6 +138,8 @@ Create an optimized daily study schedule. Rules:
 - Spread each subject's topics evenly across the available days before its deadline
 - Add exactly 1 revision session per subject, scheduled 1 day before its deadline
 - Do NOT schedule more than 6 total study hours on any single day
+- Prefer shorter frequent sessions over one long block for the same subject
+- Balance subject load so no single subject dominates one day
 - Use the EXACT subjectId and color from the input
 
 Return ONLY a valid JSON array, no markdown fences, no explanations:
@@ -74,8 +159,7 @@ Return ONLY a valid JSON array, no markdown fences, no explanations:
 ]`;
 
   try {
-    const completion = await client.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+    const completion = await generateForTask('planner', {
       messages: [
         {
           role: 'system',
@@ -84,21 +168,31 @@ Return ONLY a valid JSON array, no markdown fences, no explanations:
         { role: 'user', content: prompt },
       ],
       temperature: 0.3,
-      max_tokens: 4000,
+      maxTokens: 4000,
     });
 
-    const raw = completion.choices[0]?.message?.content || '[]';
+    const raw = completion.content || '[]';
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
       return res.status(500).json({ error: 'Failed to parse AI schedule', fallback: true });
     }
 
-    const tasks = JSON.parse(jsonMatch[0]);
+    const rawTasks = JSON.parse(jsonMatch[0]);
+    const subjectsById = new Map(subjects.map(s => [s.id, s]));
+
+    let tasks = rawTasks
+      .map((task, index) => normalizeTask(task, index, subjectsById, todayStr))
+      .filter(Boolean);
+
+    ensureRevisionTasks(tasks, subjects, todayStr);
+    tasks.sort((a, b) => new Date(a.date) - new Date(b.date));
+    balanceDailyHours(tasks, subjectsById, todayStr);
     tasks.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    res.json({ tasks, aiGenerated: true });
+    res.json({ tasks, aiGenerated: true, model: completion.model, provider: completion.provider });
   } catch (err) {
     console.error('Planner AI generate error:', err);
+    if (err.status === 503) return res.status(503).json({ error: `${err.message}. Configure the required provider key in server/.env.`, fallback: true });
     if (err.status === 429) {
       return res.status(429).json({ error: 'Rate limit reached', fallback: true });
     }
@@ -113,11 +207,6 @@ router.post('/insights', async (req, res) => {
 
   if (!subjects || subjects.length === 0) {
     return res.status(400).json({ error: 'subjects required' });
-  }
-
-  const client = getGroqClient();
-  if (!client) {
-    return res.status(503).json({ error: 'GROQ_API_KEY not configured' });
   }
 
   const today = new Date().toISOString().split('T')[0];
@@ -146,23 +235,23 @@ Give a brief, personalized coaching response in this exact JSON format:
 Return ONLY the JSON object. No markdown, no extra text.`;
 
   try {
-    const completion = await client.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
+    const completion = await generateForTask('planner', {
       messages: [
         { role: 'system', content: 'Output ONLY valid JSON. No markdown fences.' },
         { role: 'user', content: prompt },
       ],
       temperature: 0.6,
-      max_tokens: 300,
+      maxTokens: 300,
     });
 
-    const raw = completion.choices[0]?.message?.content || '{}';
+    const raw = completion.content || '{}';
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return res.status(500).json({ error: 'Parse error' });
 
-    res.json(JSON.parse(jsonMatch[0]));
+    res.json({ ...JSON.parse(jsonMatch[0]), model: completion.model, provider: completion.provider });
   } catch (err) {
     console.error('Planner insights error:', err);
+    if (err.status === 503) return res.status(503).json({ error: `${err.message}. Configure the required provider key in server/.env.` });
     res.status(500).json({ error: 'Failed to get insights' });
   }
 });

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { plannerAgent } from '../agents/plannerAgent';
 import { formatLocalDateKey } from '../utils/dateUtils';
@@ -82,6 +83,7 @@ const DEMO_SUBJECTS = [
 
 export default function Planner() {
   const { state, dispatch } = useApp();
+  const navigate = useNavigate();
   const [showAddForm, setShowAddForm]       = useState(false);
   const [activeTab, setActiveTab]           = useState('subjects');
   const [scheduleView, setScheduleView]     = useState('list');
@@ -166,20 +168,72 @@ export default function Planner() {
     if (!subjects?.length) return;
     setAiLoading(true);
     setAiInsights(null);
+    const workflow = await plannerAgent.runConnectedWorkflow(subjects, {
+      conversationHistory: state.chatHistory,
+    });
 
-    const aiTasks = await plannerAgent.generateAISchedule(subjects);
-    const tasks   = aiTasks || plannerAgent.generateSchedule(subjects);
-    const wasAI   = !!aiTasks;
+    const workflowTasks = workflow?.planner?.tasks;
+    const aiTasks = workflowTasks || await plannerAgent.generateAISchedule(subjects);
+    const tasks = aiTasks || plannerAgent.generateSchedule(subjects);
+    const wasAI = !!aiTasks;
 
     dispatch({ type: 'SET_STUDY_PLAN', payload: tasks });
     setAiGenerated(wasAI);
+
+    if (workflow?.planner?.insights) {
+      setAiInsights(workflow.planner.insights);
+    } else {
+      setAiInsights(plannerAgent.getLocalInsights(subjects, tasks));
+    }
+
+    // Bridge workflow outputs into Tutor and Evaluator state so agents feel connected.
+    if (workflow?.tutor?.answer) {
+      dispatch({
+        type: 'ADD_CHAT_MESSAGE',
+        payload: {
+          id: Date.now() + 1,
+          role: 'assistant',
+          text: workflow.tutor.answer,
+          type: 'ai',
+          hasContext: workflow.tutor.hasContext,
+          sources: workflow.tutor.sources || [],
+          model: workflow.tutor.model,
+          time: new Date().toISOString(),
+        },
+      });
+    }
+
+    if (Array.isArray(workflow?.evaluator?.questions) && workflow.evaluator.questions.length > 0) {
+      dispatch({
+        type: 'SET_CURRENT_QUIZ',
+        payload: {
+          id: `workflow-${Date.now()}`,
+          subject: 'Workflow Quiz',
+          topic: workflow.evaluator.topic || subjects[0]?.name || 'Study Topics',
+          questions: workflow.evaluator.questions,
+          totalQuestions: workflow.evaluator.questions.length,
+          generatedAt: new Date().toISOString(),
+          fromWorkflow: true,
+        },
+      });
+    }
+
     setAiLoading(false);
-    setAiInsights(plannerAgent.getLocalInsights(subjects, tasks));
 
     dispatch({
       type: 'ADD_NOTIFICATION',
-      payload: { id: Date.now(), text: wasAI ? 'AI study plan generated!' : 'Study plan generated!', time: new Date().toISOString() },
+      payload: {
+        id: Date.now(),
+        text: workflow
+          ? 'Connected workflow completed: Planner + Tutor + Evaluator'
+          : wasAI
+            ? 'AI study plan generated!'
+            : 'Study plan generated!',
+        time: new Date().toISOString(),
+      },
     });
+
+    if (workflow) return;
 
     setInsightsLoading(true);
     const ai = await plannerAgent.getInsights(subjects, tasks);
@@ -209,6 +263,15 @@ export default function Planner() {
   };
 
   const isLoading = aiLoading || demoLoading;
+  const nextTaskForHandoff = state.studyPlan.find(t => !t.completed) || state.studyPlan[0];
+  const suggestedTutorQuestion = nextTaskForHandoff
+    ? `Help me study ${nextTaskForHandoff.topic} for ${nextTaskForHandoff.subjectName}.`
+    : 'What should I focus on first today?';
+  const workflowStatus = {
+    plannerReady: state.studyPlan.length > 0,
+    tutorReady: state.chatHistory.some(m => m.role === 'assistant'),
+    evaluatorReady: Boolean(state.currentQuiz) || state.quizHistory.length > 0,
+  };
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -443,6 +506,45 @@ export default function Planner() {
             <HiOutlineRefresh /> Clear Plan
           </button>
         )}
+      </div>
+
+      {/* ── Connected Workflow ── */}
+      <div className="card" style={{ marginBottom: '18px', padding: '12px 14px' }}>
+        <div style={{ fontSize: '0.78rem', fontWeight: 700, marginBottom: 8 }}>
+          Connected Agent Workflow
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+          <span className="chip" style={{ background: workflowStatus.plannerReady ? 'rgba(0,230,118,0.12)' : 'var(--bg-glass)' }}>
+            1. Planner {workflowStatus.plannerReady ? '✓' : '...'}
+          </span>
+          <span className="chip" style={{ background: workflowStatus.tutorReady ? 'rgba(0,230,118,0.12)' : 'var(--bg-glass)' }}>
+            2. Tutor {workflowStatus.tutorReady ? '✓' : '...'}
+          </span>
+          <span className="chip" style={{ background: workflowStatus.evaluatorReady ? 'rgba(0,230,118,0.12)' : 'var(--bg-glass)' }}>
+            3. Evaluator {workflowStatus.evaluatorReady ? '✓' : '...'}
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+            Generate a plan, then continue directly to Tutor and Evaluator.
+          </span>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => navigate('/tutor', { state: { starterQuestion: suggestedTutorQuestion } })}
+            >
+              Open Tutor with Context
+            </button>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => navigate('/evaluator')}
+              disabled={!state.currentQuiz}
+              title={state.currentQuiz ? 'Start the generated workflow quiz' : 'Generate plan first to create workflow quiz'}
+            >
+              Start Evaluator Quiz
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* ── Tabs ── */}

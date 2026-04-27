@@ -24,6 +24,28 @@ export const plannerAgent = {
     }
   },
 
+  // Connected multi-agent workflow: planner -> tutor -> evaluator
+  async runConnectedWorkflow(subjects, options = {}) {
+    try {
+      const res = await apiFetch('/api/workflow/run', {
+        method: 'POST',
+        body: {
+          subjects,
+          tutorQuestion: options.tutorQuestion || 'What should I focus on first today?',
+          documentId: options.documentId || null,
+          quizNumQuestions: options.quizNumQuestions || 5,
+          quizFocusTopic: options.quizFocusTopic || '',
+          conversationHistory: options.conversationHistory || [],
+        },
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.planner?.tasks) return null;
+      return data;
+    } catch {
+      return null;
+    }
+  },
+
   // Local rule-based schedule with deadline/difficulty/priority weighting
   generateSchedule(subjects) {
     const today = new Date();

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { evaluatorAgent } from '../agents/evaluatorAgent';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,6 +11,12 @@ import { apiFetch } from '../lib/api';
 
 export default function Evaluator() {
   const { state, dispatch } = useApp();
+  const navigate = useNavigate();
+  const workflowStatus = {
+    plannerReady: state.studyPlan.length > 0,
+    tutorReady: state.chatHistory.some(m => m.role === 'assistant'),
+    evaluatorReady: Boolean(state.currentQuiz) || state.quizHistory.length > 0,
+  };
   const [activeTab, setActiveTab] = useState('quiz');
 
   // Local topic-based quiz state
@@ -133,6 +140,36 @@ export default function Evaluator() {
       <div className="page-header">
         <h1>Evaluator Agent</h1>
         <p className="subtitle">Take quizzes, track your performance, and identify areas to improve</p>
+      </div>
+
+      <div className="card" style={{ marginBottom: 12, padding: '10px 14px' }}>
+        <div style={{ fontSize: '0.78rem', fontWeight: 700, marginBottom: 8 }}>
+          Connected Agent Workflow
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+          <span className="chip" style={{ background: workflowStatus.plannerReady ? 'rgba(0,230,118,0.12)' : 'var(--bg-glass)' }}>
+            1. Planner {workflowStatus.plannerReady ? '✓' : '...'}
+          </span>
+          <span className="chip" style={{ background: workflowStatus.tutorReady ? 'rgba(0,230,118,0.12)' : 'var(--bg-glass)' }}>
+            2. Tutor {workflowStatus.tutorReady ? '✓' : '...'}
+          </span>
+          <span className="chip" style={{ background: workflowStatus.evaluatorReady ? 'rgba(0,230,118,0.12)' : 'var(--bg-glass)' }}>
+            3. Evaluator {workflowStatus.evaluatorReady ? '✓' : '...'}
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            Complete quiz here, then review mistakes in Tutor.
+          </span>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => navigate('/planner')}>
+              Back to Planner
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={() => navigate('/tutor')}>
+              Ask Tutor About Mistakes
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="tabs">
@@ -312,6 +349,57 @@ export default function Evaluator() {
         .option.selected .option-letter {
           background: var(--accent-primary);
           color: white;
+        }
+        .option.correct {
+          border-color: rgba(0,230,118,0.65);
+          background: rgba(0,230,118,0.1);
+          color: var(--text-primary);
+        }
+        .option.correct .option-letter {
+          background: var(--accent-success);
+          color: white;
+        }
+        .option.incorrect {
+          border-color: rgba(255,75,110,0.55);
+          background: rgba(255,75,110,0.1);
+          color: var(--text-primary);
+        }
+        .option.incorrect .option-letter {
+          background: var(--accent-danger);
+          color: white;
+        }
+        .option.locked {
+          cursor: default;
+        }
+        .option.locked:hover {
+          transform: none;
+        }
+        .instant-feedback {
+          margin-bottom: 20px;
+          padding: 14px 16px;
+          border-radius: var(--radius-md);
+          border: 1px solid;
+        }
+        .instant-feedback.correct {
+          background: rgba(0,230,118,0.08);
+          border-color: rgba(0,230,118,0.3);
+        }
+        .instant-feedback.incorrect {
+          background: rgba(255,75,110,0.08);
+          border-color: rgba(255,75,110,0.3);
+        }
+        .instant-feedback-title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-weight: 700;
+          font-size: 0.9rem;
+          margin-bottom: 6px;
+        }
+        .instant-feedback-text {
+          font-size: 0.85rem;
+          color: var(--text-secondary);
+          line-height: 1.5;
         }
         .question-nav {
           display: flex;
@@ -679,6 +767,9 @@ function QuizInterface({ quiz, currentQuestion, setCurrentQuestion, answers, onA
   const isLast = currentQuestion === quiz.totalQuestions - 1;
   const allAnswered = Object.keys(answers).length === quiz.totalQuestions;
   const timerDanger = timeLeft < 30;
+  const selectedAnswer = answers[currentQuestion];
+  const hasAnsweredCurrent = selectedAnswer !== undefined;
+  const isCurrentCorrect = hasAnsweredCurrent && selectedAnswer === question.correct;
 
   return (
     <div style={{ maxWidth: '720px', margin: '0 auto' }}>
@@ -719,8 +810,15 @@ function QuizInterface({ quiz, currentQuestion, setCurrentQuestion, answers, onA
           {question.options.map((option, idx) => (
             <button
               key={idx}
-              className={`option ${answers[currentQuestion] === idx ? 'selected' : ''}`}
+              className={[
+                'option',
+                answers[currentQuestion] === idx ? 'selected' : '',
+                hasAnsweredCurrent && idx === question.correct ? 'correct' : '',
+                hasAnsweredCurrent && idx === selectedAnswer && selectedAnswer !== question.correct ? 'incorrect' : '',
+                hasAnsweredCurrent ? 'locked' : '',
+              ].filter(Boolean).join(' ')}
               onClick={() => onAnswer(currentQuestion, idx)}
+              disabled={hasAnsweredCurrent}
             >
               <span className="option-letter">
                 {String.fromCharCode(65 + idx)}
@@ -729,6 +827,23 @@ function QuizInterface({ quiz, currentQuestion, setCurrentQuestion, answers, onA
             </button>
           ))}
         </div>
+
+        {hasAnsweredCurrent && (
+          <div className={`instant-feedback ${isCurrentCorrect ? 'correct' : 'incorrect'}`}>
+            <div className="instant-feedback-title" style={{ color: isCurrentCorrect ? 'var(--accent-success)' : 'var(--accent-danger)' }}>
+              {isCurrentCorrect ? <HiOutlineCheck /> : <HiOutlineX />}
+              {isCurrentCorrect ? 'Correct answer' : 'Not quite right'}
+            </div>
+            <div className="instant-feedback-text">
+              {!isCurrentCorrect && (
+                <div style={{ marginBottom: 4 }}>
+                  Correct answer: <strong>{question.options[question.correct]}</strong>
+                </div>
+              )}
+              {question.explanation}
+            </div>
+          </div>
+        )}
 
         <div className="question-nav">
           <button
